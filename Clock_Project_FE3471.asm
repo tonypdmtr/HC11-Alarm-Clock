@@ -1,4 +1,4 @@
-* Benjamin T. Fenner, FE3471
+* Benjamin T. Fenner, FE3471 (Wayne State University)
 * This Program will simulate a simple clock with Hours(12) & Minutes(60) on 4 7-Segment Displays.
 * Using pin PE7 to adjust time and alarm time.
 * The user can change the alarm time by pressing PA0. If the user presses PA0 again The program will allow them to change the time.
@@ -14,9 +14,9 @@ PD2	EQU  %00000100
 PD3	EQU  %00001000
 PD4	EQU  %00010000
 PD5	EQU  %00100000
-PortDc  EQU  $1009
-PortD   EQU  $1008
-portB	EQU  $1004
+PORTDC  EQU  $1009
+PORTD   EQU  $1008
+PORTB	EQU  $1004
 TMSK1	EQU  $1022
 TFLG1	EQU  $1023
 TMSK2   EQU  $1024
@@ -46,7 +46,7 @@ TCTL1	EQU  $1020
 	LDX  #$1000
 	LDS  #$8FFF	* Load Stack
 	LDAA #%11000011 * configure PD2-PD5 as output
-	STAA PortD
+	STAA PORTD
 
 		* Turns on A/D conversions
 
@@ -73,33 +73,33 @@ BackClr	LDAA #$01	* Let TCTL2 to accept a rising edge on PA0.				* PA0 Is reset 
 Back	CLI		* Unmask IRQ Interrupts
 
 	LDAA $10	* Load High Digit of Hour
-	STAA portB
+	STAA PORTB
 	LDAA #PD5
-	STAA PortDc	* Turn on PD5 7-Display
+	STAA PORTDC	* Turn on PD5 7-Display
 	JSR  Delay
 
 	LDAA $11	* Load Low Digit of Hour
-	STAA portB
+	STAA PORTB
 	LDAA #PD4
-	STAA PortDc	* Turn on PD4 7-Display
+	STAA PORTDC	* Turn on PD4 7-Display
 	JSR  Delay
 
 	LDAA $12	* Load High Digit of Minute
-	STAA portB
+	STAA PORTB
 	LDAA #PD3
-	STAA PortDc	* Turn on PD3 7-Display
+	STAA PORTDC	* Turn on PD3 7-Display
 	JSR  Delay
 
 	LDAA $13	* Load Low Digit of Minute
-	STAA portB
+	STAA PORTB
 	LDAA #PD2
-	STAA PortDc	* Turn on PD2 7-Display
+	STAA PORTDC	* Turn on PD2 7-Display
 	JSR  Delay
 
 	LDAA $14	* PM/AM
-	STAA portB
+	STAA PORTB
 	LDAA #PD4
-	STAA PortDc	* Turn on PD5 7-Display
+	STAA PORTDC	* Turn on PD5 7-Display
 	JSR  Delay
 
 
@@ -112,7 +112,7 @@ Back	CLI		* Unmask IRQ Interrupts
 	BNE   AlarmOn
 F2	JSR   AlarmCheck
 	BRA   Forward
-AlarmOn BRCLR	TFLG1a,X 01  Back	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
+AlarmOn BRCLR	TFLG1a,X,1,Back	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
 	LDAA  #$00			* Reset so alarm is off. $01 on, $00 off.
 	STAA  Alarm1
 	LDAA  #$00                 	* Set OM3 and OL3 in TCTL1 to
@@ -123,7 +123,7 @@ BackC1	BRA   BackClr
 		* Following code will allow user to change time or alarm with the potentiometer.
 
 
-Forward	BRCLR	TFLG1a,X 01  Back	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
+Forward	BRCLR	TFLG1a,X,1,Back	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
 
 
 	LDAA #$01	* Let TCTL2 to accept a rising edge on PA0.
@@ -131,13 +131,13 @@ Forward	BRCLR	TFLG1a,X 01  Back	* This will check if the flag on TMSK1 bit 0 is 
 	PSHY
 
 	LDY  #$001A	* Set REG Y to Location for A in HEX
-	JSR  DisA1T1	* Is a 5 second delay to give user time to press PA0 to...
+	JSR  DisA1t1	* Is a 5 second delay to give user time to press PA0 to...
 			* advance to Clock seting, Displays A1.
 
-	BRCLR	TFLG1a,X 01  JMPa	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
+	BRCLR	TFLG1a,X,1,JMPa	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
 
 	LDY  #$001B	* Set REG Y to Location for A in HEX
-	JSR  DisA1T1	* Is a 5 second delay Displays t1.
+	JSR  DisA1t1	* Is a 5 second delay Displays t1.
 
 	LDY  #$0010
 	JSR  timeSet	* Will set time for the Clock
@@ -241,8 +241,8 @@ Digit7	LDAA $07
 Digit8	LDAA $08
 	BRA  LMLoop
 Digit9	LDAA $09
-LMLoop	STAA    PortB
-	BRCLR	TFLG1a,X 01  Loop2	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
+LMLoop	STAA    PORTB
+	BRCLR	TFLG1a,X,1,Loop2	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
 	RTS
 
 
@@ -250,7 +250,7 @@ LMLoop	STAA    PortB
 
 
 HM	LDAA #PD3
-	STAA PortDc	* Turn on PD3 7-Display
+	STAA PORTDC	* Turn on PD3 7-Display
 	LDAA #$01	* Let TCTL2 to accept a rising edge on PA0.
 	STAA TFLG1a,X	* Clear Flag at IC3F so a capture can be seen.
 Loop22  LDAB ADR1,X
@@ -277,8 +277,8 @@ D3	LDAA $03
 D4	LDAA $04
 	BRA  HMLoop
 D5	LDAA $05
-HMLoop	STAA    PortB
-	BRCLR	TFLG1a,X 01  Loop22	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
+HMLoop	STAA    PORTB
+	BRCLR	TFLG1a,X,1,Loop22	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
 	RTS
 
 
@@ -286,7 +286,7 @@ HMLoop	STAA    PortB
 
 
 IfHH1	LDAA #PD4
-	STAA PortDc	* Turn on PD4 7-Display
+	STAA PORTDC	* Turn on PD4 7-Display
 	LDAA #$01	* Let TCTL2 to accept a rising edge on PA0.
 	STAA TFLG1a,X	* Clear Flag at IC3F so a capture can be seen.
 Loop77  LDAB ADR1,X
@@ -301,15 +301,15 @@ Dis0	LDAA $00
 Dis1	LDAA $01
 	BRA  LOOP17
 Dis2	LDAA $02
-LOOP17	STAA PortB
-	BRCLR	TFLG1a,X 01  Loop77	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
+LOOP17	STAA PORTB
+	BRCLR	TFLG1a,X,1,Loop77	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
 	RTS
 
 		* High Hour Set With Potentiometer
 
 
 Hour	LDAA #PD5
-	STAA PortDc	* Turn on PD5 7-Display
+	STAA PORTDC	* Turn on PD5 7-Display
 	LDAA #$01	* Let TCTL2 to accept a rising edge on PA0.
 	STAA TFLG1a,X	* Clear Flag at IC3F so a capture can be seen.
 Loop66  LDAB ADR1,X
@@ -320,8 +320,8 @@ Loop66  LDAB ADR1,X
 D00H	LDAA $00
 	BRA  HHLoop1
 D11H	LDAA $01
-HHLoop1	STAA PortB
-	BRCLR	TFLG1a,X 01  Loop66	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
+HHLoop1	STAA PORTB
+	BRCLR	TFLG1a,X,1,Loop66	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
 	RTS
 
 
@@ -329,7 +329,7 @@ HHLoop1	STAA PortB
 
 
 AMPM	LDAA #PD4
-	STAA PortDc	* Turn on PD5 7-Display
+	STAA PORTDC	* Turn on PD5 7-Display
 	LDAA #$01	* Let TCTL2 to accept a rising edge on PA0.
 	STAA TFLG1a,X	* Clear Flag at IC3F so a capture can be seen.
 Loop19  LDAB ADR1,X
@@ -340,8 +340,8 @@ Loop19  LDAB ADR1,X
 AM1	LDAA #$00
 	BRA  AMLoop
 PM1	LDAA #$80
-AMLoop	STAA PortB
-	BRCLR	TFLG1a,X 01  Loop19	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
+AMLoop	STAA PORTB
+	BRCLR	TFLG1a,X,1,Loop19	* This will check if the flag on TMSK1 bit 0 is flaged to 1.
 	RTS
 
 
@@ -349,11 +349,11 @@ AMLoop	STAA PortB
 
 
 timeSet JSR  Delay	* Set AM or PM
-	JSR  AMPM
+	bSR  AMPM
 	STAA $04,Y
 
 	JSR  Delay	* Sets High Hour of Alarm
-	JSR  Hour
+	bSR  Hour
 	STAA $00,Y
 
 	LDAA $10
@@ -362,12 +362,12 @@ timeSet JSR  Delay	* Set AM or PM
 
 	* IF HH is 1 code.
 	JSR  Delay
-	JSR  IFHH1	* If the High hour is 1 this will only allow Low Hour to be 0,1, or 2.
+	JSR  IfHH1	* If the High hour is 1 this will only allow Low Hour to be 0,1, or 2.
 	STAA $01,Y
 	BRA  LMin	* Moves to the next digit.
 
 Not1	LDAA #PD4	* Sets Low hour of Alarm
-	STAA PortDc	* Turn on PD3 7-Display
+	STAA PORTDC	* Turn on PD3 7-Display
 	JSR  Delay
 	JSR  LH
 	STAA $01,Y
@@ -377,7 +377,7 @@ LMin	JSR  Delay	* Sets High minute of Alarm
 	STAA $02,Y
 
 	LDAA #PD2	* Sets Low minute of Alarm
-	STAA PortDc	* Turn on PD5 7-Display
+	STAA PORTDC	* Turn on PD5 7-Display
 	JSR  Delay
 	JSR  LH
 	STAA $03,Y
@@ -398,13 +398,13 @@ iLoop5  DEX
 
 	LDAA $00,Y	* Load A in HEX
 	LDAA #PD4
-	STAA PortDc	* Turn on PD4 7-Display
+	STAA PORTDC	* Turn on PD4 7-Display
 	JSR  Delay
 
 	LDAA #$06	* Load 1 in HEX
-	STAA portB
+	STAA PORTB
 	LDAA #PD3
-	STAA PortDc	* Turn on PD3 7-Display
+	STAA PORTDC	* Turn on PD3 7-Display
 	JSR  Delay
 
         BNE  iLoop5
