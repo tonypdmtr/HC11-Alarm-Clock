@@ -1,12 +1,19 @@
+;*******************************************************************************
 ; Benjamin T. Fenner, FE3471 (Wayne State University)
-; This Program will simulate a simple clock with Hours(12) & Minutes(60) on 4 7-Segment Displays.
+; This Program will simulate a simple clock with Hours(12) & Minutes(60) on 4
+; 7-Segment Displays.
 ; Using pin PE7 to adjust time and alarm time.
-; The user can change the alarm time by pressing PA0. If the user presses PA0 again The program will allow them to change the time.
-; Each digit can be changed by using the Potentiometer. Once the desired digit is displayed press to advance to next digit.
-; PM is the dot on the leftmost 7-Segment Display. Once PM/AM is selected the program will return you to regular clock.
-; When the alarm time and clock time are equal the buzzer will activate. Press PA0 to turn alarm off. (Note changing time and..
+; The user can change the alarm time by pressing PA0. If the user presses PA0
+; again The program will allow them to change the time.
+; Each digit can be changed by using the Potentiometer. Once the desired digit
+; is displayed press to advance to next digit.
+; PM is the dot on the leftmost 7-Segment Display. Once PM/AM is selected the
+; program will return you to regular clock.
+; When the alarm time and clock time are equal the buzzer will activate. Press
+; PA0 to turn alarm off. (Note changing time and..
 ; the alarm will not be active) Alarm automaticly turns off after 30 seconds.
 ; Version 06
+;*******************************************************************************
 
 ; 12/14/2017
 
@@ -14,584 +21,589 @@ PD2                 equ       %00000100
 PD3                 equ       %00001000
 PD4                 equ       %00010000
 PD5                 equ       %00100000
-PORTDC              equ       $1009
-PORTD               equ       $1008
-PORTB               equ       $1004
-TMSK1               equ       $1022
-TFLG1               equ       $1023
-TMSK2               equ       $1024
-TFLG2               equ       $1025
-PACTL               equ       $1026
-TOC5                equ       $101E
-TCNT                equ       $100E
-Counter             equ       $000C
-Alarm30             equ       $001D
-TCTL1a              equ       $20
-TCTL2               equ       $21
-TFLG1a              equ       $23
-ADCTL               equ       $30
-ADR1                equ       $31
-BASE                equ       $1000
-TOC3                equ       $101A
-Alarm1              equ       $001C
-TCTL1               equ       $1020
 
+REGS                equ       $1000
+PORTDC              equ       REGS+$09
+PORTD               equ       REGS+$08
+PORTB               equ       REGS+$04
+TMSK1               equ       REGS+$22
+TFLG1               equ       REGS+$23
+TMSK2               equ       REGS+$24
+TFLG2               equ       REGS+$25
+PACTL               equ       REGS+$26
+TOC5                equ       REGS+$1E
+TCNT                equ       REGS+$0E
+TCTL2               equ       REGS+$21
+ADCTL               equ       REGS+$30
+ADR1                equ       REGS+$31
+TOC3                equ       REGS+$1A
+TCTL1               equ       REGS+$20
 
-                    org       $0000               ; List of Hex Values
-                    fcb       $3F,$06,$5B,$4F,$66,$6D,$7D,$07,$7F,$6F,$0A,$00,$00,$00  ; Hex values 0-9 for 7-Segment
-                    org       $0010               ; Time is stored here.
-                    fcb       $06,$06,$3F,$3F,$80,$06,$06,$3F,$06,$80,$77,$78,$00,$00,$00,$00  ; *Time, and then followed by alarm Time
+;*******************************************************************************
+                    #RAM      $0000               ; List of Hex values 0-9 for 7-Segment
+;*******************************************************************************
 
-                    org       $C000               ; Start Here
-                    ldx       #$1000
+Digit0              equ       $3F
+Digit1              equ       $06
+Digit2              equ       $5B
+Digit3              equ       $4F
+Digit4              equ       $66
+Digit5              equ       $6D
+Digit6              equ       $7D
+Digit7              equ       $07
+Digit8              equ       $7F
+Digit9              equ       $6F
+                    fcb       $0A
+                    fcb       0
+counter             dw        0
+
+;*******************************************************************************
+                    #RAM      $0010               ; Time followed by alarm time
+;*******************************************************************************
+
+hour                dw        $0606
+minute              dw        $3F3F
+am_pm               fcb       $80
+alarm_hour          dw        $0606
+alarm_minute        dw        $3F06
+alarm_am_pm         fcb       $80
+                    dw        $7778
+alarm1              fcb       0
+alarm30             dw        0
+                    fcb       0
+
+;*******************************************************************************
+                    #ROM      $C000               ; Start Here
+;*******************************************************************************
+
+Start               proc
+                    ldx       #REGS
                     lds       #$8FFF              ; Load Stack
-                    ldaa      #%11000011          ; configure PD2-PD5 as output
-                    staa      PORTD
-
-; Turns on A/D conversions
-
-                    ldaa      #%00100111          ; Turns on PE7
-                    staa      ADCTL,x             ; this triggers the A/D
-
-; Sets up PA0
-
-                    ldaa      #$01                ; Let TCTL2 to accept a rising edge on PA0.
-                    staa      TCTL2,x
-
-; Output Compare
-
+                    lda       #%11000011          ; configure PD2-PD5 as output
+                    sta       PORTD
+          ;-------------------------------------- ; Turns on A/D conversions
+                    lda       #%00100111          ; Turns on PE7
+                    sta       [ADCTL,x            ; this triggers the A/D
+          ;-------------------------------------- ; Sets up PA0
+                    lda       #$01                ; Let TCTL2 to accept a rising edge on PA0.
+                    sta       [TCTL2,x
+          ;-------------------------------------- ; Output Compare
                     ldd       TCNT                ; Loads REG D as the current time
                     std       TOC5                ; Saves REG D into the time keep REG TOC5 so interrupt can happen
-                    ldaa      #$29                ; Loads REG A as 0010 1000
-                    staa      TFLG1               ; Clears Flag OC5F & IC3F
-                    ldaa      #$08
-                    staa      TMSK1               ; Sets the 0C5I to allow intrupts
-                    bra       Back
+                    lda       #$29                ; Loads REG A as 0010 1000
+                    sta       TFLG1               ; Clears Flag OC5F & IC3F
+                    lda       #$08
+                    sta       TMSK1               ; Sets the 0C5I to allow intrupts
+;                   bra       Back
 
-BackClr             ldaa      #$01                ; Let TCTL2 to accept a rising edge on PA0. * PA0 Is reset to accpet a rising edge: PA0 1 in Bit 0
-                    staa      TFLG1               ; Clear Flag at IC3F so a capture can be seen on a falling edge.
+;*******************************************************************************
 
-Back                cli                           ; Unmask IRQ Interrupts
+Back                proc
+                    cli                           ; Unmask IRQ Interrupts
 
-                    ldaa      $10                 ; Load High Digit of Hour
-                    staa      PORTB
-                    ldaa      #PD5
-                    staa      PORTDC              ; Turn on PD5 7-Display
+                    lda       hour                ; Load High Digit of Hour
+                    sta       PORTB
+                    lda       #PD5
+                    sta       PORTDC              ; Turn on PD5 7-Display
                     jsr       Delay
 
-                    ldaa      $11                 ; Load Low Digit of Hour
-                    staa      PORTB
-                    ldaa      #PD4
-                    staa      PORTDC              ; Turn on PD4 7-Display
-                    jsr       Delay
+                    lda       hour+1              ; Load Low Digit of Hour
+                    sta       PORTB
+                    lda       #PD4
+                    sta       PORTDC              ; Turn on PD4 7-Display
+                    bsr       Delay
 
-                    ldaa      $12                 ; Load High Digit of Minute
-                    staa      PORTB
-                    ldaa      #PD3
-                    staa      PORTDC              ; Turn on PD3 7-Display
-                    jsr       Delay
+                    lda       minute              ; Load High Digit of Minute
+                    sta       PORTB
+                    lda       #PD3
+                    sta       PORTDC              ; Turn on PD3 7-Display
+                    bsr       Delay
 
-                    ldaa      $13                 ; Load Low Digit of Minute
-                    staa      PORTB
-                    ldaa      #PD2
-                    staa      PORTDC              ; Turn on PD2 7-Display
-                    jsr       Delay
+                    lda       minute+1            ; Load Low Digit of Minute
+                    sta       PORTB
+                    lda       #PD2
+                    sta       PORTDC              ; Turn on PD2 7-Display
+                    bsr       Delay
 
-                    ldaa      $14                 ; PM/AM
-                    staa      PORTB
-                    ldaa      #PD4
-                    staa      PORTDC              ; Turn on PD5 7-Display
-                    jsr       Delay
-
-
-; Following code will check to see if the alarm is on. ie; the current time..
-; equals alarm time and then will wait for the PAO to be pressed.
-
-
-                    ldaa      Alarm1              ; Checks if on
-                    cmpa      #$00
+                    lda       am_pm               ; PM/AM
+                    sta       PORTB
+                    lda       #PD4
+                    sta       PORTDC              ; Turn on PD5 7-Display
+                    bsr       Delay
+          ;--------------------------------------
+          ; Following code will check to see if the alarm is on.
+          ; i.e. the current time equals alarm time and then
+          ; will wait for the PAO to be pressed.
+          ;--------------------------------------
+                    lda       alarm1              ; Checks if on
                     bne       AlarmOn
-F2                  jsr       AlarmCheck
+                    jsr       AlarmCheck
                     bra       Forward
 
-AlarmOn             brclr     TFLG1a,x,1,Back     ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
-                    ldaa      #$00                ; Reset so alarm is off. $01 on, $00 off.
-                    staa      Alarm1
-                    ldaa      #$00                ; Set OM3 and OL3 in TCTL1 to
-                    staa      TCTL1               ; 01 so PA5 will toggle on each compare
-BackC1              bra       BackClr
+;*******************************************************************************
 
+AlarmOn             proc
+                    brclr     [TFLG1,x,1,Back     ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
+                    clra
+                    sta       alarm1              ; Reset so alarm is off. $01 on, $00 off.
+                                                  ; Set OM3 and OL3 in TCTL1 to
+                    sta       TCTL1               ; 01 so PA5 will toggle on each compare
+BackClr             lda       #$01                ; Let TCTL2 to accept a rising edge on PA0. * PA0 Is reset to accpet a rising edge: PA0 1 in Bit 0
+                    sta       TFLG1               ; Clear Flag at IC3F so a capture can be seen on a falling edge.
 
+;*******************************************************************************
 ; Following code will allow user to change time or alarm with the potentiometer.
 
+Forward             proc
+                    brclr     [TFLG1,x,1,Back     ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
 
-Forward             brclr     TFLG1a,x,1,Back     ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
-
-
-                    ldaa      #$01                ; Let TCTL2 to accept a rising edge on PA0.
-                    staa      TFLG1a,x            ; Clear Flag at IC3F so a capture can be seen.
+                    lda       #$01                ; Let TCTL2 to accept a rising edge on PA0.
+                    sta       [TFLG1,x            ; Clear Flag at IC3F so a capture can be seen.
                     pshy
 
-                    ldy       #$001A              ; Set REG Y to Location for A in HEX
+                    ldy       #$1A                ; Set REG Y to location for A in HEX
                     jsr       DisA1t1             ; Is a 5 second delay to give user time to press PA0 to...
-; advance to Clock seting, Displays A1.
+                                                  ; advance to Clock seting, Displays A1.
+                    brclr     [TFLG1,x,1,_@@      ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
 
-                    brclr     TFLG1a,x,1,JMPa     ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
-
-                    ldy       #$001B              ; Set REG Y to Location for A in HEX
+                    ldy       #$1B                ; Set REG Y to location for A in HEX
                     jsr       DisA1t1             ; Is a 5 second delay Displays t1.
 
-                    ldy       #$0010
-                    jsr       timeSet             ; Will set time for the Clock
+                    ldy       #$10
+                    bra       Cont@@              ; Resets the PA0 Flag
+
+_@@                 lda       #$01                ; Clear TCTL2
+                    sta       [TFLG1,x            ; Set Flag at IC3F
+                    ldy       #$15
+Cont@@              jsr       timeSet             ; Will set time for the alarm
                     puly
-
-                    jsr       Delay1
-                    bra       BackC1              ; Resets the PA0 Flag
-
-JMPa                ldaa      #$01                ; Clear TCTL2
-                    staa      TFLG1a,x            ; Set Flag at IC3F
-                    ldy       #$0015
-                    jsr       timeSet             ; Will set time for the alarm
-                    puly
-
-                    jsr       Delay1
-                    bra       BackC1              ; Resets the PA0 Flag
+                    bsr       Delay1
+                    bra       Back@@              ; Resets the PA0 Flag
 
                     swi
+Back@@              equ       BackClr
 
-
+;*******************************************************************************
 ; This sub-program will look where the Hex digit is located so that the program...
 ; can return the next increment of Hex Digit. if $06 it would change to $5B
 
-
-                    org       $C150
-Convert             ldx       #$0000              ; Load X as zero
-zLoop1              ldab      ,x                  ; Load The Hex digits 1-9
+Convert             proc
+                    clrx                          ; Load X as zero
+Loop@@              ldb       ,x                  ; Load The Hex digits 1-9
                     inx                           ; Increase X by 1
                     cba                           ; Compare The Hex code in mem to REG A Hex Code
-                    bne       zLoop1
+                    bne       Loop@@
                     rts
 
-
+;*******************************************************************************
 ; Delay Sub for 5ms so the 7-Segment Display has time to shine
 
-
-                    org       $C200
-Delay               pshx
+Delay               proc
+                    pshx
                     ldx       #1000               ; 1000 is N value for 3ms
-dLoop               dex
-                    bne       dLoop
+Loop@@              dex
+                    bne       Loop@@
                     pulx
                     rts
 
+;*******************************************************************************
 ; 1 second Delay
 
-Delay1              pshb
+Delay1              proc
+                    pshb
                     pshx
-                    ldab      #6
-oLoop               ldx       #65535
-iLoop               dex
-                    bne       iLoop
+                    ldb       #6
+Loop@@              ldx       #65535
+_@@                 dex
+                    bne       _@@
                     decb
-                    bne       oLoop
+                    bne       Loop@@
                     pulx
                     pulb
                     rts
 
+;*******************************************************************************
 ; Low Hour and Low Minute set with potentiometer
 
-
-LH                  ldaa      #$01                ; Let TCTL2 to accept a rising edge on PA0.
-                    staa      TFLG1a,x            ; Clear Flag at IC3F so a capture can be seen.
-                    ldx       #$1000
-Loop2               ldab      ADR1,x
+LH                  proc
+                    lda       #$01                ; Let TCTL2 to accept a rising edge on PA0.
+                    sta       [TFLG1,x            ; Clear Flag at IC3F so a capture can be seen.
+                    ldx       #REGS
+Loop@@              ldb       [ADR1,x
                     cmpb      #25
-                    bls       Digit0
+                    bls       _0@@
                     cmpb      #50
-                    bls       Digit1
+                    bls       _1@@
                     cmpb      #75
-                    bls       Digit2
+                    bls       _2@@
                     cmpb      #100
-                    bls       Digit3
+                    bls       _3@@
                     cmpb      #125
-                    bls       Digit4
+                    bls       _4@@
                     cmpb      #150
-                    bls       Digit5
+                    bls       _5@@
                     cmpb      #175
-                    bls       Digit6
+                    bls       _6@@
                     cmpb      #200
-                    bls       Digit7
+                    bls       _7@@
                     cmpb      #225
-                    bls       Digit8
+                    bls       _8@@
                     cmpb      #255
-                    bls       Digit9
-Digit0              ldaa      $00
-                    bra       LMLoop
+                    bls       _9@@
+_0@@                lda       #Digit0
+                    bra       Cont@@
 
-Digit1              ldaa      $01
-                    bra       LMLoop
+_1@@                lda       #Digit1
+                    bra       Cont@@
 
-Digit2              ldaa      $02
-                    bra       LMLoop
+_2@@                lda       #Digit2
+                    bra       Cont@@
 
-Digit3              ldaa      $03
-                    bra       LMLoop
+_3@@                lda       #Digit3
+                    bra       Cont@@
 
-Digit4              ldaa      $04
-                    bra       LMLoop
+_4@@                lda       #Digit4
+                    bra       Cont@@
 
-Digit5              ldaa      $05
-                    bra       LMLoop
+_5@@                lda       #Digit5
+                    bra       Cont@@
 
-Digit6              ldaa      $06
-                    bra       LMLoop
+_6@@                lda       #Digit6
+                    bra       Cont@@
 
-Digit7              ldaa      $07
-                    bra       LMLoop
+_7@@                lda       #Digit7
+                    bra       Cont@@
 
-Digit8              ldaa      $08
-                    bra       LMLoop
+_8@@                lda       #Digit8
+                    bra       Cont@@
 
-Digit9              ldaa      $09
-LMLoop              staa      PORTB
-                    brclr     TFLG1a,x,1,Loop2    ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
+_9@@                lda       #Digit9
+Cont@@              sta       PORTB
+                    brclr     [TFLG1,x,1,Loop@@   ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
                     rts
 
-
+;*******************************************************************************
 ; High Minute Potentiometer sub 0-5
 
-
-HM                  ldaa      #PD3
-                    staa      PORTDC              ; Turn on PD3 7-Display
-                    ldaa      #$01                ; Let TCTL2 to accept a rising edge on PA0.
-                    staa      TFLG1a,x            ; Clear Flag at IC3F so a capture can be seen.
-Loop22              ldab      ADR1,x
+HM                  proc
+                    lda       #PD3
+                    sta       PORTDC              ; Turn on PD3 7-Display
+                    lda       #$01                ; Let TCTL2 to accept a rising edge on PA0.
+                    sta       [TFLG1,x            ; Clear Flag at IC3F so a capture can be seen.
+Loop@@              ldb       [ADR1,x
                     cmpb      #42
-                    bls       D0
+                    bls       _0@@
                     cmpb      #84
-                    bls       D1
+                    bls       _1@@
                     cmpb      #126
-                    bls       D2
+                    bls       _2@@
                     cmpb      #168
-                    bls       D3
+                    bls       _3@@
                     cmpb      #210
-                    bls       D4
+                    bls       _4@@
                     cmpb      #255
-                    bls       D5
-D0                  ldaa      $00
-                    bra       HMLoop
+                    bls       _5@@
+_0@@                lda       #Digit0
+                    bra       Cont@@
 
-D1                  ldaa      $01
-                    bra       HMLoop
+_1@@                lda       #Digit1
+                    bra       Cont@@
 
-D2                  ldaa      $02
-                    bra       HMLoop
+_2@@                lda       #Digit2
+                    bra       Cont@@
 
-D3                  ldaa      $03
-                    bra       HMLoop
+_3@@                lda       #Digit3
+                    bra       Cont@@
 
-D4                  ldaa      $04
-                    bra       HMLoop
+_4@@                lda       #Digit4
+                    bra       Cont@@
 
-D5                  ldaa      $05
-HMLoop              staa      PORTB
-                    brclr     TFLG1a,x,1,Loop22   ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
+_5@@                lda       #Digit5
+Cont@@              sta       PORTB
+                    brclr     [TFLG1,x,1,Loop@@   ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
                     rts
 
-
+;*******************************************************************************
 ; Low Hour with High Hour being 1 Potentiometer sub 0-2
 
-
-IfHH1               ldaa      #PD4
-                    staa      PORTDC              ; Turn on PD4 7-Display
-                    ldaa      #$01                ; Let TCTL2 to accept a rising edge on PA0.
-                    staa      TFLG1a,x            ; Clear Flag at IC3F so a capture can be seen.
-Loop77              ldab      ADR1,x
+IfHH1               proc
+                    lda       #PD4
+                    sta       PORTDC              ; Turn on PD4 7-Display
+                    lda       #$01                ; Let TCTL2 to accept a rising edge on PA0.
+                    sta       [TFLG1,x            ; Clear Flag at IC3F so a capture can be seen.
+Loop@@              ldb       [ADR1,x
                     cmpb      #85
-                    bls       Dis0
+                    bls       _0@@
                     cmpb      #170
-                    bls       Dis1
+                    bls       _1@@
                     cmpb      #255
-                    bls       Dis2
-Dis0                ldaa      $00
-                    bra       LOOP17
+                    bls       _2@@
+_0@@                lda       #Digit0
+                    bra       Cont@@
 
-Dis1                ldaa      $01
-                    bra       LOOP17
+_1@@                lda       #Digit1
+                    bra       Cont@@
 
-Dis2                ldaa      $02
-LOOP17              staa      PORTB
-                    brclr     TFLG1a,x,1,Loop77   ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
+_2@@                lda       #Digit2
+Cont@@              sta       PORTB
+                    brclr     [TFLG1,x,1,Loop@@   ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
                     rts
 
+;*******************************************************************************
 ; High Hour Set With Potentiometer
 
-
-Hour                ldaa      #PD5
-                    staa      PORTDC              ; Turn on PD5 7-Display
-                    ldaa      #$01                ; Let TCTL2 to accept a rising edge on PA0.
-                    staa      TFLG1a,x            ; Clear Flag at IC3F so a capture can be seen.
-Loop66              ldab      ADR1,x
+Hour                proc
+                    lda       #PD5
+                    sta       PORTDC              ; Turn on PD5 7-Display
+                    lda       #$01                ; Let TCTL2 to accept a rising edge on PA0.
+                    sta       [TFLG1,x            ; Clear Flag at IC3F so a capture can be seen.
+Loop@@              ldb       [ADR1,x
                     cmpb      #125
-                    bls       D00H
+                    bls       _0@@
                     cmpb      #255
-                    bls       D11H
-D00H                ldaa      $00
-                    bra       HHLoop1
+                    bls       _1@@
+_0@@                lda       #Digit0
+                    bra       Cont@@
 
-D11H                ldaa      $01
-HHLoop1             staa      PORTB
-                    brclr     TFLG1a,x,1,Loop66   ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
+_1@@                lda       #Digit1
+Cont@@              sta       PORTB
+                    brclr     [TFLG1,x,1,Loop@@   ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
                     rts
 
-
+;*******************************************************************************
 ; PM or AM Set with Potentiometer
 
-
-AMPM                ldaa      #PD4
-                    staa      PORTDC              ; Turn on PD5 7-Display
-                    ldaa      #$01                ; Let TCTL2 to accept a rising edge on PA0.
-                    staa      TFLG1a,x            ; Clear Flag at IC3F so a capture can be seen.
-Loop19              ldab      ADR1,x
+AMPM                proc
+                    lda       #PD4
+                    sta       PORTDC              ; Turn on PD5 7-Display
+                    lda       #$01                ; Let TCTL2 to accept a rising edge on PA0.
+                    sta       [TFLG1,x            ; Clear Flag at IC3F so a capture can be seen.
+Loop@@              ldb       [ADR1,x
                     cmpb      #125
-                    bls       AM1
+                    bls       Am@@
                     cmpb      #255
-                    bls       PM1
-AM1                 ldaa      #$00
-                    bra       AMLoop
+                    bls       Pm@@
+Am@@                clra
+                    bra       Cont@@
 
-PM1                 ldaa      #$80
-AMLoop              staa      PORTB
-                    brclr     TFLG1a,x,1,Loop19   ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
+Pm@@                lda       #$80
+Cont@@              sta       PORTB
+                    brclr     [TFLG1,x,1,Loop@@   ; This will check if the flag on TMSK1 bit 0 is flaged to 1.
                     rts
 
-
+;*******************************************************************************
 ; Lets user set time or alarm.
 
-
-timeSet             jsr       Delay               ; Set AM or PM
+timeSet             proc
+                    jsr       Delay               ; Set AM or PM
                     bsr       AMPM
-                    staa      $04,y
+                    sta       4,y
 
                     jsr       Delay               ; Sets High Hour of Alarm
                     bsr       Hour
-                    staa      $00,y
+                    sta       ,y
 
-                    ldaa      $10
+                    lda       hour
                     cmpa      #$06
-                    bne       Not1
-
-; IF HH is 1 code.
+                    bne       _1@@
+          ;-------------------------------------- ; IF HH is 1 code
                     jsr       Delay
                     jsr       IfHH1               ; If the High hour is 1 this will only allow Low Hour to be 0,1, or 2.
-                    staa      $01,y
-                    bra       LMin                ; Moves to the next digit.
+                    sta       1,y
+                    bra       LMin@@              ; Moves to the next digit.
 
-Not1                ldaa      #PD4                ; Sets Low hour of Alarm
-                    staa      PORTDC              ; Turn on PD3 7-Display
+_1@@                lda       #PD4                ; Sets Low hour of Alarm
+                    sta       PORTDC              ; Turn on PD3 7-Display
                     jsr       Delay
                     jsr       LH
-                    staa      $01,y
+                    sta       1,y
 
-LMin                jsr       Delay               ; Sets High minute of Alarm
+LMin@@              jsr       Delay               ; Sets High minute of Alarm
                     jsr       HM
-                    staa      $02,y
+                    sta       2,y
 
-                    ldaa      #PD2                ; Sets Low minute of Alarm
-                    staa      PORTDC              ; Turn on PD5 7-Display
+                    lda       #PD2                ; Sets Low minute of Alarm
+                    sta       PORTDC              ; Turn on PD5 7-Display
                     jsr       Delay
                     jsr       LH
-                    staa      $03,y
+                    sta       3,y
+                    jmp       Delay1              ; TFLG1 has a 0 in bit 0. So it will not accept a rising edge.
 
-                    jsr       Delay1              ; TFLG1 has a 0 in bit 0. So it will not accept a rising edge.
-
-                    rts
-
+;*******************************************************************************
 ; This will Display A1 or T1 so the user knows what is active for change.
 ; It is a 5 second delay.
 
-
-DisA1t1             pshb
+DisA1t1             proc
+                    pshb
                     pshx
-                    ldab      #120
-oLoop5              ldx       #65535
-iLoop5              dex
-
-                    ldaa      $00,y               ; Load A in HEX
-                    ldaa      #PD4
-                    staa      PORTDC              ; Turn on PD4 7-Display
+                    ldb       #120
+Loop@@              ldx       #65535
+_@@                 dex
+                    lda       ,y                  ; Load A in HEX
+                    lda       #PD4
+                    sta       PORTDC              ; Turn on PD4 7-Display
                     jsr       Delay
 
-                    ldaa      #$06                ; Load 1 in HEX
-                    staa      PORTB
-                    ldaa      #PD3
-                    staa      PORTDC              ; Turn on PD3 7-Display
+                    lda       #Digit1             ; Load 1 in HEX
+                    sta       PORTB
+                    lda       #PD3
+                    sta       PORTDC              ; Turn on PD3 7-Display
                     jsr       Delay
 
-                    bne       iLoop5
+                    bne       _@@
                     decb
-                    bne       oLoop5
+                    bne       Loop@@
                     pulx
                     pulb
                     rts
 
-
+;*******************************************************************************
 ; This sub will check to see if the current time equals alarm time.
 
-
-AlarmCheck          ldaa      $10                 ; Load High Hour
-                    cmpa      $15                 ; Compare to Alarm High Hour
-                    bne       Back3
-                    ldaa      $11                 ; Load Low Hour
-                    cmpa      $16                 ; Compare to Alarm Low Hour
-                    bne       Back3
-                    ldaa      $12                 ; Load High Minute
-                    cmpa      $17                 ; Compare to Alarm High Minute
-                    bne       Back3
-                    ldaa      $13                 ; Load Low Minute
-                    cmpa      $18                 ; Compare to Alarm Low Minute
-                    bne       Back3
-                    ldaa      $14                 ; Load AMPM
-                    cmpa      $19                 ; Compare to Alarm AMPM
-                    bne       Back3
-                    ldaa      #$01
-                    staa      Alarm1              ; Stores 1 into Mem for a check if alarm on.
+AlarmCheck          proc
+                    lda       hour                ; Load High Hour
+                    cmpa      alarm_hour          ; Compare to Alarm High Hour
+                    bne       Done@@
+                    lda       hour+1              ; Load Low Hour
+                    cmpa      alarm_hour+1        ; Compare to Alarm Low Hour
+                    bne       Done@@
+                    lda       minute              ; Load High Minute
+                    cmpa      alarm_minute        ; Compare to Alarm High Minute
+                    bne       Done@@
+                    lda       minute+1            ; Load Low Minute
+                    cmpa      alarm_minute+1      ; Compare to Alarm Low Minute
+                    bne       Done@@
+                    lda       am_pm               ; Load AMPM
+                    cmpa      alarm_am_pm         ; Compare to Alarm AMPM
+                    bne       Done@@
+                    lda       #1
+                    sta       alarm1              ; Stores 1 into Mem for a check if alarm on.
                     pshx
-                    ldx       #$0000              ; Resets the Alarm30 to #$0000 for a 30second delay.
-                    stx       Alarm30
-                    ldx       Counter
+                    clrx                          ; Resets the alarm30 to zero for a 30 second delay.
+                    stx       alarm30
+                    ldx       counter
                     cpx       #100
-                    bhi       Loop100             ; Makes sure buzzer doesn't come back on after alarm is off, 1 min.
-                    ldaa      #$20
-                    staa      TFLG1
-                    ldaa      #$10                ; Set OM3 and OL3 in TCTL1 to
-                    staa      TCTL1               ; 01 so PA5 will toggle on each compare
-Loop100             pulx
-Back3               rts
+                    pulx
+                    bhi       Done@@              ; Makes sure buzzer doesn't come back on after alarm is off, 1 min.
+                    lda       #$20
+                    sta       TFLG1
+                    lda       #$10                ; Set OM3 and OL3 in TCTL1 to
+                    sta       TCTL1               ; 01 so PA5 will toggle on each compare
+Done@@              rts
 
+;*******************************************************************************
+; Speaker interrupt to allow the speaker to be heard
 
-; Keeping Time Interrupts
-
-
-                    org       $00D9               ; Speaker Interrupt
-                    jmp       $C500
-
-                    org       $00D3               ; Clock Interrupt
-                    jmp       $C550
-
-; This Interrupt will allow the speaker to be heard.
-
-                    org       $C500               ; Speaker interrupt
+Speaker_Handler     proc
                     ldd       TOC3                ; TOC3 is connected to PA5
                     addd      #12000
                     std       TOC3
-                    ldaa      #$20                ; Sets Flag
-                    staa      TFLG1
+                    lda       #$20                ; Sets Flag
+                    sta       TFLG1
                     rti
 
-; This interrupt will Increment time 1 minute at a time.
+;*******************************************************************************
+; Increment time 1 minute at a time
 
-
-                    org       $C550
-                    ldaa      #$08                ; Loads REG A as 0000 1000
-                    staa      TFLG1               ; Clears Flag OC5F
-                    staa      TMSK1               ; Sets the 0C5I to allow intrupts
+Clock_Handler       proc
+                    lda       #$08                ; Loads REG A as 0000 1000
+                    sta       TFLG1               ; Clears Flag OC5F
+                    sta       TMSK1               ; Sets the 0C5I to allow intrupts
                     cli                           ; Unmask IRQ Interrupts
 
-                    ldaa      Alarm1
-                    cmpa      #$01                ; Checks if alarm is on.
-                    bne       Aoff
-                    ldx       Alarm30
+                    lda       alarm1
+                    cmpa      #1                  ; Checks if alarm is on.
+                    bne       _1@@
+                    ldx       alarm30
                     inx
-                    stx       Alarm30
+                    stx       alarm30
                     cpx       #916                ; Check if 30 seconds have passed.
-                    bne       Aoff
-                    ldaa      #$00                ; Turns off alarm.
-                    staa      Alarm1
-                    ldx       #$0000              ; Resets alarm for future use.
-                    stx       Alarm30
+                    bne       _1@@
+                    clr       alarm1              ; Turns off alarm.
+                    clrx                          ; Resets alarm for future use.
+                    stx       alarm30
 
-Aoff                ldx       Counter
+_1@@                ldx       counter
                     inx
-                    stx       Counter
+                    stx       counter
                     cpx       #1830
-                    bne       Temp1
+                    bne       _2@@
 
                     ldd       TCNT
                     addd      #61800              ; 60/0.03277 = 1830.942935; .942935*.03277/.0005m = 61800
                     std       TOC5
-                    bra       Branch2
+                    bra       Done@@
 
-Temp1               cpx       #1831
-                    bne       Branch2
-                    ldx       #$0000
-                    stx       Counter
-
-; now 1 minute has passed. We need to increase minutes by 1.
-
-                    ldaa      $13                 ; Load Low Minute
+_2@@                cpx       #1831
+                    bne       Done@@
+                    clrx
+                    stx       counter
+          ;--------------------------------------
+          ; now 1 minute has passed. We need to increase minutes by 1.
+          ;--------------------------------------
+                    lda       minute+1            ; Load Low Minute
                     jsr       Convert             ; Convert to a num from 7-Segment Hex
-                    ldaa      ,x                ; Load New Hex
-                    staa      $13                 ; Changes A to next Hex value
-                    cmpa      #$0A                ; compare is X = 0009
-                    bne       Branch2             ; branch if !=0 Branch back
+                    lda       ,x                  ; Load New Hex
+                    sta       minute+1            ; Changes A to next Hex value
+                    cmpa      #10                 ; compare is X = 0009
+                    bne       Done@@              ; branch if !=0 Branch back
 
-                    ldaa      $00                 ; Load A as zero
-                    staa      $13                 ; Reset low minute to zero
-                    ldaa      $12                 ; Load High Minute
+                    clr       minute+1            ; Reset low minute to zero
+                    lda       minute              ; Load High Minute
                     jsr       Convert             ; Convert to a num from 7-Segment Hex
-                    ldaa      ,x                ; Load new Hex
-                    staa      $12                 ; Changes A to next Hex value
+                    lda       ,x                  ; Load new Hex
+                    sta       minute              ; Changes A to next Hex value
                     cmpa      #$7D                ; If High Minute = 6
-                    bne       Branch2             ; If !=0 branch back
-
-; If 60 Minutes Increase hour By 1
-
-                    ldaa      $00                 ; Load A as zero
-                    staa      $12                 ; Reset High minute to zero
-                    ldaa      $10                 ; Loading High bit to see if It's a 0,1
+                    bne       Done@@              ; If !=0 branch back
+          ;-------------------------------------- ; If 60 Minutes Increase hour By 1
+                    clr       minute              ; Reset High minute to zero
+                    lda       hour                ; Loading High bit to see if It's a 0,1
                     jsr       Convert
                     cmpa      #$06                ; Compare to 1
-                    bne       Skip                ; Branch to bits 0-9 if less than 1
-                    ldaa      $11                 ; Load low Hour
+                    bne       _4@@                ; Branch to bits 0-9 if less than 1
+                    lda       hour+1              ; Load low Hour
                     jsr       Convert             ; Convert to a num from 7-Segment Hex
-                    ldaa      ,x                ; Load New Hex
-                    staa      $11                 ; Changes A to next Hex value
+                    lda       ,x                  ; Load New Hex
+                    sta       hour+1              ; Changes A to next Hex value
 
                     cmpa      #$5B                ; Seeing if AM/PM Changed
-                    bne       Pass
-                    ldaa      $14
+                    bne       Pass@@
+                    lda       am_pm
                     cmpa      #$80                ; Check if it is PM or not
-                    bne       Branch4
-                    ldaa      #$00                ; Set to AM
-                    staa      $14
-                    bra       Branch2
+                    bne       _3@@
+                    clra                          ; Set to AM
+                    sta       am_pm
+                    bra       Done@@
 
-Branch4             ldaa      #$80                ; Set to PM
+_3@@                lda       #$80                ; Set to PM
 
-Pass                cmpa      #$4F                ; If Low Hours = 3
-                    bne       Branch2             ; If !=0 branch back
-                    ldaa      $01                 ; Load A as 01:00
-                    staa      $11                 ; Reset Low Hour to 01:00
-                    ldaa      $00                 ; Seting High Hour to 0
-                    staa      $10
-                    bra       Branch2
-
-; If High Hour <= 1
-
-Skip                ldaa      $11                 ; Load low Hour
+Pass@@              cmpa      #$4F                ; If Low Hours = 3
+                    bne       Done@@              ; If !=0 branch back
+                    lda       #1                  ; Load A as 01:00
+                    sta       hour+1              ; Reset Low Hour to 01:00
+                    clr       hour                ; Seting High Hour to 0
+                    bra       Done@@
+          ;-------------------------------------- ; If High Hour <= 1
+_4@@                lda       hour+1              ; Load low Hour
                     jsr       Convert             ; Convert to a num from 7-Segment Hex
-                    ldaa      ,x                ; Load New Hex
-                    staa      $11                 ; Changes A to next Hex value
-                    cmpa      #$0A                ; If Low Hours = 10
-                    bne       Branch2             ; If !=0 branch back
-
-; If High Hour > 1
-
-Skip2               ldaa      $00                 ; Load A as zero
-                    staa      $11                 ; Reset Low Hour to zero
-                    ldaa      $10                 ; Load High Hour
+                    lda       ,x                  ; Load New Hex
+                    sta       hour+1              ; Changes A to next Hex value
+                    cmpa      #10                 ; If Low Hours = 10
+                    bne       Done@@              ; If !=0 branch back
+          ;-------------------------------------- ; If High Hour > 1
+                    clr       hour+1              ; Reset Low Hour to zero
+                    lda       hour                ; Load High Hour
                     jsr       Convert             ; Convert to a num from 7-Segment Hex
-                    ldaa      ,x                ; Load New Hex
-                    staa      $10                 ; Changes A to next Hex value
-Branch2             rti
+                    lda       ,x                  ; Load New Hex
+                    sta       hour                ; Changes A to next Hex value
+Done@@              rti
+
+;*******************************************************************************
+; Keeping Time Interrupts
+;*******************************************************************************
+
+                    #VECTORS  $00D9               ; Speaker Interrupt
+                    jmp       Speaker_Handler
+
+                    #VECTORS  $00D3               ; Clock Interrupt
+                    jmp       Clock_Handler
