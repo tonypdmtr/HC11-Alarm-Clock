@@ -20,28 +20,29 @@
 ; 2021-03-14        Bug fixes, optimizations, and ASM11 compatibility by tonyp@acm.org
 
 REGS                equ       $1000
-PORTDC              equ       REGS+$09
-PORTD               equ       REGS+$08
-PORTB               equ       REGS+$04
-TMSK1               equ       REGS+$22
-TFLG1               equ       REGS+$23
-TMSK2               equ       REGS+$24
-TFLG2               equ       REGS+$25
-PACTL               equ       REGS+$26
-TOC5                equ       REGS+$1E
-TCNT                equ       REGS+$0E
-TCTL2               equ       REGS+$21
-ADCTL               equ       REGS+$30
-ADR1                equ       REGS+$31
-TOC3                equ       REGS+$1A
-TCTL1               equ       REGS+$20
+PORTB               equ       REGS+$04,1          ;Port B Data
+PORTD               equ       REGS+$08,1          ;Port D Data
+DDRD                equ       REGS+$09,1          ;Data Direction Register D
+TCNT                equ       REGS+$0E,2          ;Timer Count
+TOC3                equ       REGS+$1A,2          ;Timer Output Compare 3
+TOC5                equ       REGS+$1E,2          ;Timer Output Compare 5
+TCTL1               equ       REGS+$20,1          ;Timer Control 1
+TCTL2               equ       REGS+$21,1          ;Timer Control 2
+TFLG1               equ       REGS+$23,1          ;Timer Interrupt Flag 1
+TMSK1               equ       REGS+$22,1          ;Timer Interrupt Mask 1
+ADCTL               equ       REGS+$30,1          ;A/D Control Status Register
+ADR1                equ       REGS+$31,1          ;A/D Result 1
 
-RAM                 equ       $0000
-ROM                 equ       $C000
-STACKTOP            equ       $8FFF
+RAM                 def       $0000
+ROM                 def       $C000
+STACKTOP            def       $8FFF
 
-BUS_HZ              equ       2000000             ;CPU bus speed in Hz
+BUS_HZ              def       2000000             ;CPU bus speed in Hz
 BUS_KHZ             equ       BUS_HZ/1000         ;CPU bus speed in KHz
+
+LED_DATA            equ       PORTB
+LED_CTRL            equ       PORTD
+LED_DDRD            equ       DDRD
 
 PD2                 equ       %00000100
 PD3                 equ       %00001000
@@ -109,12 +110,12 @@ MsgT1               fcb       $78
 ;*******************************************************************************
 
 Start               proc
-                    ldx       #REGS
                     lds       #STACKTOP           ; Initialize stack
+                    ldx       #REGS
                     bsr       InitVariables
           ;-------------------------------------- ; configure PD2-PD5 as output
                     lda       #%11000011
-                    sta       PORTD
+                    sta       LED_DDRD
           ;-------------------------------------- ; Turns on A/D conversions
                     lda       #%00100111          ; Turns on PE7
                     sta       [ADCTL,x            ; this triggers the A/D
@@ -127,41 +128,41 @@ Start               proc
                     lda       #$29                ; Loads REG A as 0010 1001
                     sta       TFLG1               ; Clears flags OC3F, OC5F & IC3F
                     lda       #$08
-                    sta       TMSK1               ; Sets the 0C5I to allow intrupts
-                    cli                           ; Allow IRQ interrupts
+                    sta       TMSK1               ; sets the 0C5I to allow interrupts
+                    cli                           ; allow IRQ interrupts
 ;                   bra       Back
 
 ;*******************************************************************************
 
 Back                proc
-                    lda       hour                ; Load high digit of hour
-                    sta       PORTB
+                    lda       hour                ; load high digit of hour
+                    sta       LED_DATA
                     lda       #PD5
-                    sta       PORTDC              ; Turn on PD5 7-seg display
+                    sta       LED_CTRL            ; Turn on PD5 7-seg display
                     jsr       Delay
 
-                    lda       hour+1              ; Load Low Digit of Hour
-                    sta       PORTB
+                    lda       hour+1              ; load low digit of hour
+                    sta       LED_DATA
                     lda       #PD4
-                    sta       PORTDC              ; Turn on PD4 7-seg display
+                    sta       LED_CTRL            ; Turn on PD4 7-seg display
                     bsr       Delay
 
                     lda       minute              ; Load High Digit of Minute
-                    sta       PORTB
+                    sta       LED_DATA
                     lda       #PD3
-                    sta       PORTDC              ; Turn on PD3 7-seg display
+                    sta       LED_CTRL            ; Turn on PD3 7-seg display
                     bsr       Delay
 
                     lda       minute+1            ; Load Low Digit of Minute
-                    sta       PORTB
+                    sta       LED_DATA
                     lda       #PD2
-                    sta       PORTDC              ; Turn on PD2 7-seg display
+                    sta       LED_CTRL            ; Turn on PD2 7-seg display
                     bsr       Delay
 
                     lda       am_pm               ; PM/AM
-                    sta       PORTB
+                    sta       LED_DATA
                     lda       #PD4
-                    sta       PORTDC              ; Turn on PD5 7-seg display
+                    sta       LED_CTRL            ; Turn on PD5 7-seg display
                     bsr       Delay
           ;--------------------------------------
           ; Check to see if the alarm is on, i.e. the current time equals
@@ -296,7 +297,7 @@ Loop@@              ldb       [ADR1,x
 
                     lda       #Digit9
 
-Cont@@              sta       PORTB
+Cont@@              sta       LED_DATA
                     brclr     [TFLG1,x,1,Loop@@   ; Check if TMSK1[0] is 1
                     rts
 
@@ -305,7 +306,7 @@ Cont@@              sta       PORTB
 
 SetHM               proc
                     lda       #PD3
-                    sta       PORTDC              ; Turn on PD3 7-seg display
+                    sta       LED_CTRL            ; Turn on PD3 7-seg display
                     lda       #%00000001          ; Let TCTL2 accept a rising edge on PA0
                     sta       [TFLG1,x            ; Clear IC3F flag so a capture can be seen
 
@@ -333,7 +334,7 @@ Loop@@              ldb       [ADR1,x
 
                     lda       #Digit5
 
-Cont@@              sta       PORTB
+Cont@@              sta       LED_DATA
                     brclr     [TFLG1,x,1,Loop@@   ; Check if TMSK1[0] is 1
                     rts
 
@@ -342,7 +343,7 @@ Cont@@              sta       PORTB
 
 SetHH               proc
                     lda       #PD4
-                    sta       PORTDC              ; Turn on PD4 7-seg display
+                    sta       LED_CTRL            ; Turn on PD4 7-seg display
                     lda       #%00000001          ; Let TCTL2 accept a rising edge on PA0
                     sta       [TFLG1,x            ; Clear IC3F flag so a capture can be seen
 
@@ -358,7 +359,7 @@ Loop@@              ldb       [ADR1,x
 
                     lda       #Digit2
 
-Cont@@              sta       PORTB
+Cont@@              sta       LED_DATA
                     brclr     [TFLG1,x,1,Loop@@   ; Check if TMSK1[0] is 1
                     rts
 
@@ -367,7 +368,7 @@ Cont@@              sta       PORTB
 
 SetHour             proc
                     lda       #PD5
-                    sta       PORTDC              ; Turn on PD5 7-seg display
+                    sta       LED_CTRL            ; Turn on PD5 7-seg display
                     lda       #%00000001          ; Let TCTL2 accept a rising edge on PA0
                     sta       [TFLG1,x            ; Clear IC3F flag so a capture can be seen
 
@@ -379,7 +380,7 @@ Loop@@              ldb       [ADR1,x
 
                     lda       #Digit1
 
-Cont@@              sta       PORTB
+Cont@@              sta       LED_DATA
                     brclr     [TFLG1,x,1,Loop@@   ; Check if TMSK1[0] is 1
                     rts
 
@@ -388,7 +389,7 @@ Cont@@              sta       PORTB
 
 SetAMorPM           proc
                     lda       #PD4
-                    sta       PORTDC              ; Turn on PD5 7-seg display
+                    sta       LED_CTRL            ; Turn on PD5 7-seg display
                     lda       #%00000001          ; Let TCTL2 accept a rising edge on PA0
                     sta       [TFLG1,x            ; Clear IC3F flag so a capture can be seen
 
@@ -400,7 +401,7 @@ Loop@@              ldb       [ADR1,x
 
                     lda       #Dot
 
-Cont@@              sta       PORTB
+Cont@@              sta       LED_DATA
                     brclr     [TFLG1,x,1,Loop@@   ; Check if TMSK1[0] is 1
                     rts
 
@@ -408,35 +409,35 @@ Cont@@              sta       PORTB
 ; Lets user set time or alarm
 
 SetAlarmTime        proc
-                    bsr       ?Delay              ; Set AM or PM
+                    bsr       ?Delay              ; set AM or PM
                     bsr       SetAMorPM
                     sta       4,y
 
-                    bsr       ?Delay              ; Sets High Hour of Alarm
+                    bsr       ?Delay              ; sets high hour of alarm
                     bsr       SetHour
                     sta       ,y
 
                     lda       hour
                     cmpa      #Digit1
                     bne       _1@@
-          ;-------------------------------------- ; IF HH is 1 code
+          ;-------------------------------------- ; if HH is 1 code
                     bsr       ?Delay
-                    bsr       SetHH               ; If the High hour is 1 this will only allow Low Hour to be 0,1, or 2
+                    bsr       SetHH               ; if the high hour is 1 this will only allow low hour to be 0,1, or 2
                     sta       1,y
-                    bra       LMin@@              ; Moves to the next digit
+                    bra       LMin@@              ; moves to the next digit
 
-_1@@                lda       #PD4                ; Sets Low hour of Alarm
-                    sta       PORTDC              ; Turn on PD3 7-seg display
+_1@@                lda       #PD4                ; sets low hour of alarm
+                    sta       LED_CTRL            ; turn on PD3 7-seg display
                     bsr       ?Delay
                     jsr       SetLH
                     sta       1,y
 
-LMin@@              bsr       ?Delay              ; Sets High minute of Alarm
+LMin@@              bsr       ?Delay              ; sets high minute of alarm
                     jsr       SetHM
                     sta       2,y
 
-                    lda       #PD2                ; Sets Low minute of Alarm
-                    sta       PORTDC              ; Turn on PD5 7-seg display
+                    lda       #PD2                ; sets low minute of alarm
+                    sta       LED_CTRL            ; turn on PD5 7-seg display
                     bsr       ?Delay
                     jsr       SetLH
                     sta       3,y
@@ -481,15 +482,15 @@ DispA1orT1          proc
 Delay@@             ldx       #BUS_KHZ
                               #temp :cycles
 Loop@@              lda       ,y                  ; Load A in HEX
-                    sta       PORTB
+                    sta       LED_DATA
                     lda       #PD4
-                    sta       PORTDC              ; Turn on PD4 7-seg display
+                    sta       LED_CTRL            ; Turn on PD4 7-seg display
                     bsr       ?Delay
 
                     lda       #Digit1             ; Load 1 in HEX
-                    sta       PORTB
+                    sta       LED_DATA
                     lda       #PD3
-                    sta       PORTDC              ; Turn on PD3 7-seg display
+                    sta       LED_CTRL            ; Turn on PD3 7-seg display
                     bsr       ?Delay
 
                     dex
@@ -511,30 +512,38 @@ CheckAlarm          proc
                     lda       hour                ; Load High Hour
                     cmpa      alarm_hour          ; Compare to Alarm High Hour
                     bne       Done@@
+
                     lda       hour+1              ; Load Low Hour
                     cmpa      alarm_hour+1        ; Compare to Alarm Low Hour
                     bne       Done@@
+
                     lda       minute              ; Load High Minute
-                    cmpa      alarm_minute        ; Compare to Alarm High Minute
+                    cmpa      alarm_minute        ; compare to alarm high minute
                     bne       Done@@
-                    lda       minute+1            ; Load Low Minute
-                    cmpa      alarm_minute+1      ; Compare to Alarm Low Minute
+
+                    lda       minute+1            ; load low minute
+                    cmpa      alarm_minute+1      ; compare to alarm low minute
                     bne       Done@@
-                    lda       am_pm               ; Load AMPM
-                    cmpa      alarm_am_pm         ; Compare to Alarm AMPM
+
+                    lda       am_pm               ; load AMPM
+                    cmpa      alarm_am_pm         ; compare to alarm AMPM
                     bne       Done@@
+
                     lda       #1
-                    sta       alarm1              ; Stores 1 into Mem for a check if alarm on
+                    sta       alarm1              ; stores 1 into Mem for a check if alarm on
+
                     pshx
-                    clrx                          ; Resets the alarm30 to zero for a 30 second delay
+                    clrx                          ; resets the alarm30 to zero for a 30 second delay
                     stx       alarm30
                     ldx       counter
                     cpx       #100
                     pulx
-                    bhi       Done@@              ; Makes sure buzzer doesn't come back on after alarm is off, 1 min
+                    bhi       Done@@              ; makes sure buzzer doesn't come back on after alarm is off, 1 min
+
                     lda       #$20
                     sta       TFLG1
-                    lda       #%00000010          ; Set OM3 and OL3 in TCTL1 to
+
+                    lda       #%00000010          ; set OM3 and OL3 in TCTL1 to
                     sta       TCTL1               ; 01 so PA5 will toggle on each compare
 Done@@              rts
 
@@ -545,7 +554,7 @@ Speaker_Handler     proc
                     ldd       TOC3                ; TOC3 is connected to PA5
                     addd      #12000
                     std       TOC3
-                    lda       #$20                ; Sets flag
+                    lda       #$20                ; sets flag
                     sta       TFLG1
                     rti
 
@@ -555,19 +564,21 @@ Speaker_Handler     proc
 Clock_Handler       proc
                     lda       #$08                ; Loads REG A as 0000 1000
                     sta       TFLG1               ; Clears OC5F flag
-                    sta       TMSK1               ; Sets the 0C5I to allow intrupts
-                    cli                           ; Unmask IRQ Interrupts
+                    sta       TMSK1               ; sets the 0C5I to allow interrupts
+                    cli                           ; allow IRQ interrupts
 
                     lda       alarm1
-                    cmpa      #1                  ; Checks if alarm is on
+                    cmpa      #1                  ; checks if alarm is on
                     bne       _1@@
+
                     ldx       alarm30
                     inx
                     stx       alarm30
                     cpx       #916                ; Check if 30 seconds have passed
                     bne       _1@@
-                    clr       alarm1              ; Turns off alarm
-                    clrx                          ; Resets alarm for future use
+
+                    clr       alarm1              ; turns off alarm
+                    clrx                          ; resets alarm for future use
                     stx       alarm30
 
 _1@@                ldx       counter
@@ -575,9 +586,12 @@ _1@@                ldx       counter
                     stx       counter
                     cpx       #1830
                     bne       _2@@
-
+          ;--------------------------------------
+          ; 60/0.03277 = 1830.942935
+          ; .942935*.03277/.0005m = 61800
+          ;--------------------------------------
                     ldd       TCNT
-                    addd      #61800              ; 60/0.03277 = 1830.942935; .942935*.03277/.0005m = 61800
+                    addd      #61800
                     std       TOC5
                     bra       Done@@
 
@@ -589,7 +603,7 @@ _2@@                cpx       #1831
           ; now 1 minute has passed. We need to increase minutes by 1
           ;--------------------------------------
                     lda       minute+1            ; Load Low Minute
-                    jsr       Convert             ; Convert to a num from 7-Segment Hex
+                    jsr       Convert             ; Convert to a num from 7-segment Hex
                     lda       ,x                  ; Load New Hex
                     sta       minute+1            ; Changes A to next Hex value
                     cmpa      #10                 ; compare is X = 0009
@@ -597,7 +611,7 @@ _2@@                cpx       #1831
 
                     clr       minute+1            ; Reset low minute to zero
                     lda       minute              ; Load High Minute
-                    jsr       Convert             ; Convert to a num from 7-Segment Hex
+                    jsr       Convert             ; Convert to a num from 7-segment Hex
                     lda       ,x                  ; Load new Hex
                     sta       minute              ; Changes A to next Hex value
                     cmpa      #Digit6             ; If High Minute = 6
@@ -609,7 +623,7 @@ _2@@                cpx       #1831
                     cmpa      #Digit1             ; Compare to 1
                     bne       _4@@                ; Branch to bits 0-9 if less than 1
                     lda       hour+1              ; Load low Hour
-                    jsr       Convert             ; Convert to a num from 7-Segment Hex
+                    jsr       Convert             ; Convert to a num from 7-segment Hex
                     lda       ,x                  ; Load New Hex
                     sta       hour+1              ; Changes A to next Hex value
 
@@ -618,38 +632,38 @@ _2@@                cpx       #1831
                     lda       am_pm
                     cmpa      #Dot                ; Check if it is PM or not
                     bne       _3@@
-                    clr       am_pm               ; Set to AM
+                    clr       am_pm               ; set to AM
                     bra       Done@@
 
-_3@@                lda       #Dot                ; Set to PM
+_3@@                lda       #Dot                ; set to PM
 
-Pass@@              cmpa      #Digit3             ; If Low Hours = 3
-                    bne       Done@@              ; If !=0 branch back
-                    lda       #1                  ; Load A as 01:00
-                    sta       hour+1              ; Reset Low Hour to 01:00
-                    clr       hour                ; Seting High Hour to 0
+Pass@@              cmpa      #Digit3             ; if low hours = 3
+                    bne       Done@@              ; if !=0 branch back
+                    lda       #1                  ; load A as 01:00
+                    sta       hour+1              ; reset low hour to 01:00
+                    clr       hour                ; Set high hour to 0
                     bra       Done@@
-          ;-------------------------------------- ; If High Hour <= 1
-_4@@                lda       hour+1              ; Load low Hour
-                    jsr       Convert             ; Convert to a num from 7-Segment Hex
-                    lda       ,x                  ; Load New Hex
-                    sta       hour+1              ; Changes A to next Hex value
-                    cmpa      #10                 ; If Low Hours = 10
-                    bne       Done@@              ; If !=0 branch back
-          ;-------------------------------------- ; If High Hour > 1
-                    clr       hour+1              ; Reset Low Hour to zero
-                    lda       hour                ; Load High Hour
-                    jsr       Convert             ; Convert to a num from 7-Segment Hex
-                    lda       ,x                  ; Load New Hex
-                    sta       hour                ; Changes A to next Hex value
+          ;-------------------------------------- ; if high hour <= 1
+_4@@                lda       hour+1              ; load low hour
+                    jsr       Convert             ; convert to a num from 7-segment hex
+                    lda       ,x                  ; load new hex
+                    sta       hour+1              ; changes A to next hex value
+                    cmpa      #10                 ; if low hours = 10
+                    bne       Done@@              ; if !=0 branch back
+          ;-------------------------------------- ; if high hour > 1
+                    clr       hour+1              ; reset low hour to zero
+                    lda       hour                ; load high hour
+                    jsr       Convert             ; convert to a num from 7-segment hex
+                    lda       ,x                  ; load new hex
+                    sta       hour                ; changes A to next hex value
 Done@@              rti
 
 ;*******************************************************************************
 ; Keeping Time Interrupts
 ;*******************************************************************************
 
-                    #VECTORS  $00D9               ; Speaker Interrupt
-                    jmp       Speaker_Handler
-
-                    #VECTORS  $00D3               ; Clock Interrupt
+                    #VECTORS  $00D3               ; clock interrupt
                     jmp       Clock_Handler
+
+                    #VECTORS  $00D9               ; speaker interrupt
+                    jmp       Speaker_Handler
