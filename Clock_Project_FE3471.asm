@@ -49,28 +49,28 @@ PD3                 equ       %00001000
 PD4                 equ       %00010000
 PD5                 equ       %00100000
 
-Digit0              equ       $3F
-Digit1              equ       $06
-Digit2              equ       $5B
-Digit3              equ       $4F
-Digit4              equ       $66
-Digit5              equ       $6D
-Digit6              equ       $7D
-Digit7              equ       $07
-Digit8              equ       $7F
-Digit9              equ       $6F
+DIGIT0              equ       $3F
+DIGIT1              equ       $06
+DIGIT2              equ       $5B
+DIGIT3              equ       $4F
+DIGIT4              equ       $66
+DIGIT5              equ       $6D
+DIGIT6              equ       $7D
+DIGIT7              equ       $07
+DIGIT8              equ       $7F
+DIGIT9              equ       $6F
 Dot                 equ       $80
 
 ;*******************************************************************************
                     #RAM      RAM
 ;*******************************************************************************
 
-hour                rmb       2                   ;fcb Digit1,Digit1
-minute              rmb       2                   ;fcb Digit0,Digit0
+hour                rmb       2                   ;fcb DIGIT1,DIGIT1
+minute              rmb       2                   ;fcb DIGIT0,DIGIT0
 am_pm               rmb       1                   ;fcb Dot
 
-alarm_hour          rmb       2                   ;fcb Digit1,Digit1
-alarm_minute        rmb       2                   ;fcb Digit0,Digit1
+alarm_hour          rmb       2                   ;fcb DIGIT1,DIGIT1
+alarm_minute        rmb       2                   ;fcb DIGIT0,DIGIT1
 alarm_am_pm         rmb       1                   ;fcb Dot
 
 alarm1              rmb       1                   ;fcb 0
@@ -88,14 +88,14 @@ InitVariables       proc
                     clr       alarm30
                     clr       alarm30+1
 
-                    lda       #Digit1
+                    lda       #DIGIT1
                     sta       hour
                     sta       hour+1
                     sta       alarm_hour
                     sta       alarm_hour+1
                     sta       alarm_minute+1
 
-                    lda       #Digit0
+                    lda       #DIGIT0
                     sta       minute
                     sta       minute+1
                     sta       alarm_minute
@@ -259,43 +259,43 @@ SetLH               proc
 
 Loop@@              ldb       [ADR1,x
 
-                    lda       #Digit0
+                    lda       #DIGIT0
                     cmpb      #25
                     bls       Cont@@
 
-                    lda       #Digit1
+                    lda       #DIGIT1
                     cmpb      #50
                     bls       Cont@@
 
-                    lda       #Digit2
+                    lda       #DIGIT2
                     cmpb      #75
                     bls       Cont@@
 
-                    lda       #Digit3
+                    lda       #DIGIT3
                     cmpb      #100
                     bls       Cont@@
 
-                    lda       #Digit4
+                    lda       #DIGIT4
                     cmpb      #125
                     bls       Cont@@
 
-                    lda       #Digit5
+                    lda       #DIGIT5
                     cmpb      #150
                     bls       Cont@@
 
-                    lda       #Digit6
+                    lda       #DIGIT6
                     cmpb      #175
                     bls       Cont@@
 
-                    lda       #Digit7
+                    lda       #DIGIT7
                     cmpb      #200
                     bls       Cont@@
 
-                    lda       #Digit8
+                    lda       #DIGIT8
                     cmpb      #225
                     bls       Cont@@
 
-                    lda       #Digit9
+                    lda       #DIGIT9
 
 Cont@@              sta       LED_DATA
                     brclr     [TFLG1,x,1,Loop@@   ; Check if TMSK1[0] is 1
@@ -312,27 +312,27 @@ SetHM               proc
 
 Loop@@              ldb       [ADR1,x
 
-                    lda       #Digit0
+                    lda       #DIGIT0
                     cmpb      #42
                     bls       Cont@@
 
-                    lda       #Digit1
+                    lda       #DIGIT1
                     cmpb      #84
                     bls       Cont@@
 
-                    lda       #Digit2
+                    lda       #DIGIT2
                     cmpb      #126
                     bls       Cont@@
 
-                    lda       #Digit3
+                    lda       #DIGIT3
                     cmpb      #168
                     bls       Cont@@
 
-                    lda       #Digit4
+                    lda       #DIGIT4
                     cmpb      #210
                     bls       Cont@@
 
-                    lda       #Digit5
+                    lda       #DIGIT5
 
 Cont@@              sta       LED_DATA
                     brclr     [TFLG1,x,1,Loop@@   ; Check if TMSK1[0] is 1
@@ -349,15 +349,15 @@ SetHH               proc
 
 Loop@@              ldb       [ADR1,x
 
-                    lda       #Digit0
+                    lda       #DIGIT0
                     cmpb      #85
                     bls       Cont@@
 
-                    lda       #Digit1
+                    lda       #DIGIT1
                     cmpb      #170
                     bls       Cont@@
 
-                    lda       #Digit2
+                    lda       #DIGIT2
 
 Cont@@              sta       LED_DATA
                     brclr     [TFLG1,x,1,Loop@@   ; Check if TMSK1[0] is 1
@@ -374,11 +374,11 @@ SetHour             proc
 
 Loop@@              ldb       [ADR1,x
 
-                    lda       #Digit0
+                    lda       #DIGIT0
                     cmpb      #125
                     bls       Cont@@
 
-                    lda       #Digit1
+                    lda       #DIGIT1
 
 Cont@@              sta       LED_DATA
                     brclr     [TFLG1,x,1,Loop@@   ; Check if TMSK1[0] is 1
@@ -418,7 +418,7 @@ SetAlarmTime        proc
                     sta       ,y
 
                     lda       hour
-                    cmpa      #Digit1
+                    cmpa      #DIGIT1
                     bne       _1@@
           ;-------------------------------------- ; if HH is 1 code
                     bsr       ?Delay
@@ -487,7 +487,7 @@ Loop@@              lda       ,y                  ; Load A in HEX
                     sta       LED_CTRL            ; Turn on PD4 7-seg display
                     bsr       ?Delay
 
-                    lda       #Digit1             ; Load 1 in HEX
+                    lda       #DIGIT1             ; Load 1 in HEX
                     sta       LED_DATA
                     lda       #PD3
                     sta       LED_CTRL            ; Turn on PD3 7-seg display
@@ -614,20 +614,20 @@ _2@@                cpx       #1831
                     jsr       Convert             ; Convert to a num from 7-segment Hex
                     lda       ,x                  ; Load new Hex
                     sta       minute              ; Changes A to next Hex value
-                    cmpa      #Digit6             ; If High Minute = 6
+                    cmpa      #DIGIT6             ; If High Minute = 6
                     bne       Done@@              ; If !=0 branch back
           ;-------------------------------------- ; If 60 Minutes Increase hour By 1
                     clr       minute              ; Reset High minute to zero
                     lda       hour                ; Loading High bit to see if It's a 0,1
                     jsr       Convert
-                    cmpa      #Digit1             ; Compare to 1
+                    cmpa      #DIGIT1             ; Compare to 1
                     bne       _4@@                ; Branch to bits 0-9 if less than 1
                     lda       hour+1              ; Load low Hour
                     jsr       Convert             ; Convert to a num from 7-segment Hex
                     lda       ,x                  ; Load New Hex
                     sta       hour+1              ; Changes A to next Hex value
 
-                    cmpa      #Digit2             ; Seeing if AM/PM Changed
+                    cmpa      #DIGIT2             ; Seeing if AM/PM Changed
                     bne       Pass@@
                     lda       am_pm
                     cmpa      #Dot                ; Check if it is PM or not
@@ -637,7 +637,7 @@ _2@@                cpx       #1831
 
 _3@@                lda       #Dot                ; set to PM
 
-Pass@@              cmpa      #Digit3             ; if low hours = 3
+Pass@@              cmpa      #DIGIT3             ; if low hours = 3
                     bne       Done@@              ; if !=0 branch back
                     lda       #1                  ; load A as 01:00
                     sta       hour+1              ; reset low hour to 01:00
